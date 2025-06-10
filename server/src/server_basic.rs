@@ -3,19 +3,17 @@ use grpc_demo_proto::{
     HelloRequest, HelloResponse,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tonic::{transport::Server, Request, Response, Status};
 use tracing::{info, instrument};
-use tower::ServiceBuilder;
-use tower_http::timeout::TimeoutLayer;
 
 #[derive(Debug, Default)]
-pub struct MyGreeter {
+pub struct BaselineGreeter {
     request_count: AtomicU64,
 }
 
 #[tonic::async_trait]
-impl GreeterService for MyGreeter {
+impl GreeterService for BaselineGreeter {
     #[instrument(skip(self))]
     async fn say_hello(
         &self,
@@ -26,19 +24,19 @@ impl GreeterService for MyGreeter {
         
         let name = request.into_inner().name;
 
-        // CPU work for profiling
+        // Same CPU work as other servers for fair comparison
         let mut sum = 0u64;
         for i in 0..50000 {
             sum = sum.wrapping_add(i * i);
         }
 
         let reply = HelloResponse {
-            message: format!("Hello {} (optimized server, request #{}, sum: {})!", name, count, sum % 1000),
+            message: format!("Hello {} (baseline server, request #{}, sum: {})!", name, count, sum % 1000),
         };
 
         let duration = start_time.elapsed();
         if count % 100 == 0 {
-            info!("Request #{} completed in {:?}", count, duration);
+            info!("Baseline request #{} completed in {:?}", count, duration);
         }
 
         Ok(Response::new(reply))
@@ -50,36 +48,27 @@ impl GreeterService for MyGreeter {
         &self,
         _request: Request<HelloRequest>,
     ) -> Result<Response<Self::SayHelloStreamStream>, Status> {
-        Err(Status::unimplemented("Streaming not implemented in main server"))
+        // Simple implementation for baseline
+        Err(Status::unimplemented("Streaming not implemented in baseline server"))
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize basic tracing
     tracing_subscriber::fmt()
-        .with_env_filter("grpc_demo_server=info,tower=info,tonic=info")
+        .with_env_filter("grpc_demo_server=info")
         .with_target(false)
         .init();
 
-    let addr = "[::1]:50051".parse()?;
-    let greeter = MyGreeter::default();
+    let addr = "[::]:50052".parse()?;  // Different port
+    let greeter = BaselineGreeter::default();
 
-    info!("Enhanced GreeterServer with Connection Pooling listening on {}", addr);
-    info!("Server features: request counting, detailed logging, connection pooling");
+    info!("🔧 Baseline Server (NO connection pooling) listening on {}", addr);
+    info!("📊 Features: Basic gRPC only, no optimizations");
 
+    // Basic server configuration - NO connection pooling optimizations
     Server::builder()
-        .tcp_keepalive(Some(Duration::from_secs(600)))
-        .tcp_nodelay(true)
-        .timeout(Duration::from_secs(30))
-        .concurrency_limit_per_connection(256)
-        .initial_stream_window_size(Some(1024 * 1024))
-        .initial_connection_window_size(Some(1024 * 1024))
-        .max_concurrent_streams(Some(1000))
-        .layer(
-            ServiceBuilder::new()
-                .layer(TimeoutLayer::new(Duration::from_secs(30)))
-                .into_inner(),
-        )
         .add_service(GreeterServiceServer::new(greeter))
         .serve(addr)
         .await?;

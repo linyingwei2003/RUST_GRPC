@@ -1,7 +1,8 @@
 use grpc_demo_proto::{greeter_service_client::GreeterServiceClient, HelloRequest};
 use clap::Parser;
 use std::time::{Duration, Instant};
-use tracing::{info, warn};
+use tracing::{info, warn, error};
+use tonic::transport::Channel;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -17,10 +18,6 @@ struct Args {
     /// Server address
     #[arg(short, long, default_value = "http://[::1]:50051")]
     server: String,
-
-    /// Test streaming requests instead of unary
-    #[arg(short = 'S', long)]
-    streaming: bool,
 }
 
 #[tokio::main]
@@ -28,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    info!("Starting benchmark with {} clients making {} requests each", 
+    info!("Debugging error patterns: {} clients making {} requests each", 
           args.clients, args.requests);
 
     let start_time = Instant::now();
@@ -37,44 +34,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for client_id in 0..args.clients {
         let server_url = args.server.clone();
         let requests = args.requests;
-        let streaming = args.streaming;
         
         let handle = tokio::spawn(async move {
-            benchmark_client(client_id, server_url, requests, streaming).await
+            benchmark_client(client_id, server_url, requests).await
         });
         handles.push(handle);
     }
 
     let mut total_requests = 0;
     let mut total_errors = 0;
-    let mut min_latency = Duration::MAX;
-    let mut max_latency = Duration::ZERO;
-    let mut total_latency = Duration::ZERO;
+    let mut error_details = Vec::new();
 
     for handle in handles {
         let result = handle.await?;
         total_requests += result.requests;
         total_errors += result.errors;
-        min_latency = min_latency.min(result.min_latency);
-        max_latency = max_latency.max(result.max_latency);
-        total_latency += result.total_latency;
+        error_details.extend(result.error_details);
     }
 
     let total_duration = start_time.elapsed();
-    let avg_latency = total_latency / total_requests as u32;
-    let qps = total_requests as f64 / total_duration.as_secs_f64();
+    let success_rate = (total_requests - total_errors) as f64 / total_requests as f64 * 100.0;
 
-    println!("\n=== Benchmark Results ===");
+    println!("\n=== Error Analysis Results ===");
     println!("Total requests: {}", total_requests);
     println!("Total errors: {}", total_errors);
-    println!("Success rate: {:.2}%", 
-             (total_requests - total_errors) as f64 / total_requests as f64 * 100.0);
+    println!("Success rate: {:.4}%", success_rate);
     println!("Total duration: {:?}", total_duration);
-    println!("QPS: {:.2}", qps);
-    println!("Latencies:");
-    println!("  Min: {:?}", min_latency);
-    println!("  Max: {:?}", max_latency);
-    println!("  Avg: {:?}", avg_latency);
+
+    if !error_details.is_empty() {
+        println!("\n=== Error Breakdown ===");
+        let mut error_counts = std::collections::HashMap::new();
+        for error in &error_details {
+            *error_counts.entry(error.clone()).or_insert(0) += 1;
+        }
+        
+        for (error, count) in error_counts {
+            println!("  {}: {} occurrences", error, count);
+        }
+    }
 
     Ok(())
 }
@@ -83,72 +80,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 struct BenchmarkResult {
     requests: usize,
     errors: usize,
-    min_latency: Duration,
-    max_latency: Duration,
-    total_latency: Duration,
+    error_details: Vec<String>,
 }
 
 async fn benchmark_client(
     client_id: usize,
     server_url: String,
     requests: usize,
-    streaming: bool,
 ) -> BenchmarkResult {
-    let mut client = match GreeterServiceClient::connect(server_url).await {
-        Ok(client) => client,
+    let mut error_details = Vec::new();
+    
+    // Create basic connection
+    let channel_result = Channel::from_shared(server_url)
+        .unwrap()
+        .timeout(Duration::from_secs(60))
+        .connect()
+        .await;
+
+    let mut client = match channel_result {
+        Ok(channel) => GreeterServiceClient::new(channel),
         Err(e) => {
-            warn!("Client {} failed to connect: {}", client_id, e);
+            error!("Client {} failed to connect: {:?}", client_id, e);
+            error_details.push(format!("Connection failed: {}", e));
             return BenchmarkResult {
-                requests: 0,
+                requests,
                 errors: requests,
-                min_latency: Duration::ZERO,
-                max_latency: Duration::ZERO,
-                total_latency: Duration::ZERO,
+                error_details,
             };
         }
     };
 
     let mut errors = 0;
-    let mut min_latency = Duration::MAX;
-    let mut max_latency = Duration::ZERO;
-    let mut total_latency = Duration::ZERO;
 
     for i in 0..requests {
-        let start = Instant::now();
+        let request = tonic::Request::new(HelloRequest {
+            name: format!("Client-{}-Request-{}", client_id, i),
+        });
         
-        let result = if streaming {
-            // For streaming, we'll just initiate the stream and count the first response
-            let request = tonic::Request::new(HelloRequest {
-                name: format!("Client-{}-Request-{}", client_id, i),
-            });
-            
-            match client.say_hello_stream(request).await {
-                Ok(_) => Ok(()),
-                Err(e) => Err(e),
+        match client.say_hello(request).await {
+            Ok(_) => {},
+            Err(e) => {
+                errors += 1;
+                let error_msg = format!("Client {} req {}: {}", client_id, i, e);
+                error_details.push(error_msg.clone());
+                if errors <= 5 {
+                    warn!("{}", error_msg);
+                }
             }
-        } else {
-            let request = tonic::Request::new(HelloRequest {
-                name: format!("Client-{}-Request-{}", client_id, i),
-            });
-            
-            match client.say_hello(request).await {
-                Ok(_) => Ok(()),
-                Err(e) => Err(e),
-            }
-        };
-
-        let latency = start.elapsed();
-        total_latency += latency;
-        min_latency = min_latency.min(latency);
-        max_latency = max_latency.max(latency);
-
-        if result.is_err() {
-            errors += 1;
-            warn!("Client {} request {} failed: {:?}", client_id, i, result.err());
         }
-
-        // Small delay between requests to avoid overwhelming
-        tokio::time::sleep(Duration::from_millis(10)).await;
     }
 
     info!("Client {} completed {} requests with {} errors", 
@@ -157,8 +136,6 @@ async fn benchmark_client(
     BenchmarkResult {
         requests,
         errors,
-        min_latency,
-        max_latency,
-        total_latency,
+        error_details,
     }
 }

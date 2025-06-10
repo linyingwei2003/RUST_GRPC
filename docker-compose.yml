@@ -1,0 +1,14 @@
+services:  
+  rust-grpc-dev:  
+    build: .  
+    container_name: rust-grpc-dev  
+    ports:  
+      - "50051:50051"  
+      - "50052:50052"  
+      - "3000:3000"  
+    volumes:  
+      - .:/workspace  
+    working_dir: /workspace  
+    stdin_open: true  
+    tty: true  
+    command: /bin/bash 

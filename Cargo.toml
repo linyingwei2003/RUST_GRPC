@@ -1,5 +1,5 @@
 [workspace]
-members = ["server", "client", "proto", "benchmark", "profiling"]
+members = ["server", "client", "proto", "benchmark"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -7,6 +7,9 @@ tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 tonic = "0.10"
 prost = "0.12"
 prost-types = "0.12"
+# pprof profiling dependencies (Linux only)
+pprof = { version = "0.13", features = ["flamegraph", "prost-codec"] }
+axum = "0.7"
 
 [workspace.dependencies.tonic-build]
 version = "0.10"

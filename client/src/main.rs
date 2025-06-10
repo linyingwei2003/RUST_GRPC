@@ -1,9 +1,22 @@
 use grpc_demo_proto::{greeter_service_client::GreeterServiceClient, HelloRequest};
 use tokio_stream::StreamExt;
+use tonic::transport::{Channel, Endpoint};
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = GreeterServiceClient::connect("http://[::1]:50051").await?;
+    // Create connection with pooling configuration
+    let endpoint = Endpoint::from_static("http://[::1]:50051")
+        .timeout(Duration::from_secs(30))
+        .tcp_keepalive(Some(Duration::from_secs(600)))
+        .tcp_nodelay(true)
+        .http2_keep_alive_interval(Duration::from_secs(30))
+        .keep_alive_while_idle(true);
+
+    let channel = endpoint.connect().await?;
+    let mut client = GreeterServiceClient::new(channel);
+
+    println!("=== Connected with Connection Pooling ===");
 
     // Single request
     println!("=== Single Request ===");
@@ -13,6 +26,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let response = client.say_hello(request).await?;
     println!("RESPONSE={:?}", response.into_inner());
+
+    // Multiple requests to test connection reuse
+    println!("\n=== Multiple Requests (Connection Reuse Test) ===");
+    for i in 1..=5 {
+        let request = tonic::Request::new(HelloRequest {
+            name: format!("Request {}", i),
+        });
+
+        let start = std::time::Instant::now();
+        let response = client.say_hello(request).await?;
+        let duration = start.elapsed();
+        
+        println!("Request {}: {:?} (took: {:?})", i, response.into_inner(), duration);
+    }
 
     // Streaming request
     println!("\n=== Streaming Request ===");
@@ -34,5 +61,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    println!("\n=== Connection Pooling Test Complete ===");
     Ok(())
 }

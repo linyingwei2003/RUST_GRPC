@@ -11,3 +11,18 @@ tokio-stream = "0.1"
 # Simple profiling dependencies
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# pprof profiling (Linux only)
+pprof = { workspace = true }
+axum = { workspace = true }
+serde_json = "1.0"
+# Connection pooling and middleware
+tower = "0.4"
+tower-http = { version = "0.4", features = ["timeout"] }
+
+[[bin]]
+name = "grpc-demo-server-basic"
+path = "src/server_basic.rs"
+
+[[bin]]
+name = "grpc-demo-server-optimized"
+path = "src/server_optimized.rs"

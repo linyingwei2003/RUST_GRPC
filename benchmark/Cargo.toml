@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 grpc-demo-proto = { path = "../proto" }
 tokio = { workspace = true, features = ["time"] }
+tokio-stream = "0.1"
 tonic = { workspace = true }
 clap = { version = "4.0", features = ["derive"] }
 tracing = "0.1"
