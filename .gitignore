@@ -1,0 +1,44 @@
+# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Profiling outputs
+flamegraph.svg
+profile.pb
+*.prof
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Windows
+*.exe
+*.dll
+*.lib
+*.exp
+
+# Protoc download
+protoc-*.zip
+
+# Build artifacts
+/target/
+/Cargo.lock

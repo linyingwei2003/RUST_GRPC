@@ -1,0 +1,13 @@
+[package]
+name = "grpc-demo-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+grpc-demo-proto = { path = "../proto" }
+tokio = { workspace = true }
+tonic = { workspace = true }
+tokio-stream = "0.1"
+# Simple profiling dependencies
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

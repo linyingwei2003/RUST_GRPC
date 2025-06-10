@@ -1,0 +1,10 @@
+[package]
+name = "grpc-demo-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+grpc-demo-proto = { path = "../proto" }
+tokio = { workspace = true }
+tonic = { workspace = true }
+tokio-stream = "0.1"
