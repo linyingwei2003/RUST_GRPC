@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package ads;
+
+// Represents a Shopify Shop Campaign settings
+message ShopCampaign {
+  string id = 1;
+  double budget = 2;
+  double roas = 3;
+  double acquire_cost = 4;
+}
+
+message AdRequest {
+  string campaign_id = 1;
+}
+
+message AdResponse {
+  string ad_text = 1;
+  double bid = 2;
+}
+
+service AdsService {
+  // Get an ad and calculated bid for the campaign
+  rpc ServeAd(AdRequest) returns (AdResponse);
+}

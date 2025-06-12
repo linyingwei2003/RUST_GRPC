@@ -26,3 +26,7 @@ path = "src/server_basic.rs"
 [[bin]]
 name = "grpc-demo-server-optimized"
 path = "src/server_optimized.rs"
+
+[[bin]]
+name = "grpc-demo-server-ads"
+path = "src/ads_server.rs"
