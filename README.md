@@ -113,6 +113,7 @@ rust_grpc/
 │   ├── src/
 │   │   ├── server_optimized.rs           # Connection pooled + profiling
 │   │   ├── server_basic.rs               # Baseline implementation
+│   │   ├── ads_server.rs                 # Ads delivery demo
 │   │   └── baseline_main.rs              # Alternative baseline
 │   └── Cargo.toml
 │
@@ -267,6 +268,7 @@ docker-compose up --scale grpc-server-optimized=3
 | **Basic Server** | `cargo run --bin grpc-demo-server-basic --release` | Baseline server for comparison |
 | **Client** | `cargo run --bin grpc-demo-client --release` | gRPC client with connection optimization |
 | **Benchmark** | `cargo run --bin grpc-demo-benchmark --release` | Performance testing tool |
+| **Ads Server** | `cargo run --bin grpc-demo-server-ads --release` | Ads delivery engine demo |
 | **Docker** | `docker-compose up --build` | Complete development environment |
 
 ## 🔧 Configuration Options
