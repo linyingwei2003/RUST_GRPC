@@ -90,4 +90,51 @@ mod tests {
         // Expected: 12.0 / 2.0 = 6.0, min(0.0, 6.0) = 0.0
         assert_eq!(bid, 0.0);
     }
+
+    #[test]
+    fn test_bid_calculation_integration() {
+        // Test various scenarios that match the problem statement
+        
+        // Scenario 1: Normal case with sufficient budget
+        let campaign1 = Campaign::new(100.0, 2.0);
+        assert_eq!(campaign1.next_bid(), 6.0); // 12.0 / 2.0 = 6.0
+        
+        // Scenario 2: Budget-constrained case
+        let campaign2 = Campaign::new(3.0, 1.5);
+        assert_eq!(campaign2.next_bid(), 3.0); // 12.0 / 1.5 = 8.0, but budget limits to 3.0
+        
+        // Scenario 3: High ROAS scenario
+        let campaign3 = Campaign::new(100.0, 6.0);
+        assert_eq!(campaign3.next_bid(), 2.0); // 12.0 / 6.0 = 2.0
+        
+        // Scenario 4: Low ROAS scenario 
+        let campaign4 = Campaign::new(100.0, 0.8);
+        assert_eq!(campaign4.next_bid(), 15.0); // 12.0 / 0.8 = 15.0
+    }
+
+    #[test]
+    fn test_demonstrate_bid_calculation_details() {
+        println!("=== Campaign Bid Calculation Demo ===");
+        println!("Formula: min(remaining_budget, expected_revenue / roas)");
+        println!("Expected Revenue (mock): 12.0");
+        
+        let test_cases = vec![
+            (100.0, 2.0, "Normal case"),
+            (5.0, 2.0, "Budget-constrained case"),
+            (100.0, 4.0, "High ROAS case"),
+        ];
+
+        for (budget, roas, description) in test_cases {
+            let campaign = Campaign::new(budget, roas);
+            let bid = campaign.next_bid();
+            let max_bid = 12.0 / roas;
+            
+            println!("{}: Budget=${:.2}, ROAS={:.2}", description, budget, roas);
+            println!("  -> Max bid (12.0 / {:.2}) = {:.2}", roas, max_bid);
+            println!("  -> Final bid (min({:.2}, {:.2})) = {:.2}", budget, max_bid, bid);
+            
+            // Verify the calculation
+            assert_eq!(bid, budget.min(max_bid));
+        }
+    }
 }
