@@ -9,6 +9,8 @@ use tracing::{info, instrument};
 use tower::ServiceBuilder;
 use tower_http::timeout::TimeoutLayer;
 
+pub mod campaign;
+
 #[derive(Debug, Default)]
 pub struct MyGreeter {
     request_count: AtomicU64,
@@ -32,13 +34,20 @@ impl GreeterService for MyGreeter {
             sum = sum.wrapping_add(i * i);
         }
 
+        // Example usage of Campaign bid calculation
+        let campaign = campaign::Campaign::new(50.0, 2.5);
+        let next_bid = campaign.next_bid();
+
         let reply = HelloResponse {
-            message: format!("Hello {} (optimized server, request #{}, sum: {})!", name, count, sum % 1000),
+            message: format!(
+                "Hello {} (optimized server, request #{}, sum: {}, next_bid: {:.2})!", 
+                name, count, sum % 1000, next_bid
+            ),
         };
 
         let duration = start_time.elapsed();
         if count % 100 == 0 {
-            info!("Request #{} completed in {:?}", count, duration);
+            info!("Request #{} completed in {:?}, next_bid: {:.2}", count, duration, next_bid);
         }
 
         Ok(Response::new(reply))
